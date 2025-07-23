@@ -11,21 +11,26 @@ interface QRScannerProps {
 
 export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
+  const [cameraStatus, setCameraStatus] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { startScanning, stopScanning, videoRef, handleFileUpload, error } = useQRScanner(onQRScanned);
 
   const handleStartScanning = async () => {
     try {
+      setCameraStatus("Requesting camera access...");
       await startScanning();
       setIsScanning(true);
+      setCameraStatus("Camera active");
     } catch (err) {
       console.error("Failed to start scanning:", err);
+      setCameraStatus("Camera access failed");
     }
   };
 
   const handleStopScanning = () => {
     stopScanning();
     setIsScanning(false);
+    setCameraStatus("");
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +86,7 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
                 <Camera className="w-12 h-12 mb-3 opacity-50 mx-auto" />
                 <p className="text-sm opacity-75">Camera will appear here</p>
                 <p className="text-xs opacity-50 mt-2">Allow camera access when prompted</p>
+                <p className="text-xs opacity-30 mt-1">Make sure you're using HTTPS</p>
               </div>
             </div>
           )}
@@ -89,6 +95,12 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
         {error && (
           <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
             <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        {cameraStatus && (
+          <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-600 text-center">{cameraStatus}</p>
           </div>
         )}
 
@@ -129,16 +141,26 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
         </div>
 
         {/* Test UPI for development */}
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-          <p className="text-xs text-gray-600 mb-2">Test Mode (Skip camera if not working):</p>
-          <Button 
-            onClick={() => onQRScanned("testmerchant@paytm")}
-            variant="outline"
-            size="sm"
-            className="w-full text-xs"
-          >
-            Use Test UPI: testmerchant@paytm
-          </Button>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-gray-600 mb-2">Camera not working? Use test mode:</p>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => onQRScanned("testmerchant@paytm")}
+              variant="outline"
+              size="sm"
+              className="flex-1 text-xs"
+            >
+              Test UPI: testmerchant@paytm
+            </Button>
+            <Button 
+              onClick={() => onQRScanned("merchant@phonepe")}
+              variant="outline"
+              size="sm"
+              className="flex-1 text-xs"
+            >
+              Test UPI: merchant@phonepe
+            </Button>
+          </div>
         </div>
 
         {/* Detected UPI ID Display */}

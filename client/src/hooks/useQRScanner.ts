@@ -32,27 +32,37 @@ export function useQRScanner(onQRScanned: (data: string) => void) {
         throw new Error("Camera access is not supported in this browser. Please use HTTPS or try uploading an image instead.");
       }
 
-      // Try different camera constraints for better compatibility
+      // Request camera permission with simpler constraints first
       let stream: MediaStream;
       try {
-        // First try with back camera
+        // Try basic video constraints first
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { exact: "environment" },
-            width: { ideal: 1280, max: 1920 },
-            height: { ideal: 720, max: 1080 },
-          },
+          video: true,
+          audio: false
         });
-      } catch (backCameraError) {
-        console.log("Back camera not available, trying front camera");
-        // Fallback to front camera or any available camera
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 1280, max: 1920 },
-            height: { ideal: 720, max: 1080 },
-          },
-        });
+        console.log("Camera stream obtained successfully");
+      } catch (basicError) {
+        console.log("Basic camera access failed, trying with specific constraints");
+        try {
+          // Try with back camera
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "environment",
+              width: { ideal: 640, max: 1280 },
+              height: { ideal: 480, max: 720 }
+            }
+          });
+        } catch (backCameraError) {
+          console.log("Back camera not available, trying front camera");
+          // Fallback to front camera
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "user",
+              width: { ideal: 640, max: 1280 },
+              height: { ideal: 480, max: 720 }
+            }
+          });
+        }
       }
 
       streamRef.current = stream;
@@ -62,12 +72,27 @@ export function useQRScanner(onQRScanned: (data: string) => void) {
         
         // Wait for video to be ready and start scanning
         videoRef.current.onloadedmetadata = () => {
+          console.log("Video metadata loaded");
           if (videoRef.current) {
             videoRef.current.play().then(() => {
-              setTimeout(() => scanQRCode(), 500); // Small delay to ensure video is playing
+              console.log("Video started playing");
+              setTimeout(() => {
+                console.log("Starting QR code scanning");
+                scanQRCode();
+              }, 1000); // Longer delay to ensure video is stable
+            }).catch((playError) => {
+              console.error("Video play failed:", playError);
+              setError("Failed to start video playback");
             });
           }
         };
+        
+        // Also handle the case where video is already ready
+        if (videoRef.current.readyState >= 2) {
+          videoRef.current.play().then(() => {
+            setTimeout(() => scanQRCode(), 1000);
+          });
+        }
       }
 
     } catch (err: any) {

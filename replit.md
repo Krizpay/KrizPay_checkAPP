@@ -4,6 +4,15 @@
 
 KrizPay is a modern web application that enables crypto-to-UPI payments, allowing users to pay UPI merchants using USDT cryptocurrency. The application features QR code scanning for UPI IDs, real-time exchange rate conversion, wallet integration for crypto transactions, and live transaction status updates via WebSocket connections.
 
+## Recent Changes (Jan 23, 2025)
+
+- Fixed camera access issues with enhanced permission handling and error messages
+- Added fallback from back camera to front camera for better mobile compatibility  
+- Integrated real jsQR library for actual QR code scanning functionality
+- Added test UPI buttons for development and testing when camera isn't available
+- Fixed Onmeta API integration with proper staging endpoints and headers
+- Enhanced user feedback with camera status indicators and clear error messages
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
