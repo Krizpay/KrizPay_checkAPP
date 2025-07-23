@@ -1,10 +1,21 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import QrScanner from "qr-scanner";
 
 export function useQRScanner(onQRScanned: (data: string) => void) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const qrScannerRef = useRef<QrScanner | null>(null);
   const [error, setError] = useState<string>("");
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (qrScannerRef.current) {
+        qrScannerRef.current.stop();
+        qrScannerRef.current.destroy();
+        qrScannerRef.current = null;
+      }
+    };
+  }, []);
 
   const extractUPIId = (qrData: string): string | null => {
     // Common UPI QR code patterns

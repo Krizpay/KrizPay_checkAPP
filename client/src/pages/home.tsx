@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { QRScanner } from "@/components/QRScanner";
+import { QRScannerTest } from "@/components/QRScannerTest";
 import { AmountInput } from "@/components/AmountInput";
 import { PaymentConfirmation } from "@/components/PaymentConfirmation";
 import { TransactionStatus } from "@/components/TransactionStatus";
@@ -16,6 +17,7 @@ export default function Home() {
   const [inrAmount, setInrAmount] = useState<number>(0);
   const [showTransactionStatus, setShowTransactionStatus] = useState<boolean>(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
+  const [useTestMode, setUseTestMode] = useState<boolean>(true); // Start with test mode
   
   const { isConnected, address, balance } = useWallet();
   
@@ -55,8 +57,28 @@ export default function Home() {
       </header>
 
       <main className="max-w-md mx-auto px-4 py-6 space-y-6">
+        {/* Mode Toggle */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">
+              {useTestMode ? "Test Mode" : "Camera Mode"}
+            </span>
+            <Button
+              onClick={() => setUseTestMode(!useTestMode)}
+              variant="outline"
+              size="sm"
+            >
+              Switch to {useTestMode ? "Camera" : "Test"}
+            </Button>
+          </div>
+        </Card>
+
         {/* QR Scanner */}
-        <QRScanner onQRScanned={handleQRScanned} scannedUPIId={scannedUPIId} />
+        {useTestMode ? (
+          <QRScannerTest onQRScanned={handleQRScanned} />
+        ) : (
+          <QRScanner onQRScanned={handleQRScanned} scannedUPIId={scannedUPIId} />
+        )}
 
         {/* Amount Input */}
         <AmountInput 
