@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useQRScanner } from "@/hooks/useQRScanner";
-import { QrCode, Camera, Upload, CheckCircle } from "lucide-react";
+import { QrCode, Camera, Upload, CheckCircle, XCircle } from "lucide-react";
+import { Scanner } from "@yudiel/react-qr-scanner";
 
 interface QRScannerProps {
   onQRScanned: (upiId: string) => void;
@@ -11,33 +11,70 @@ interface QRScannerProps {
 
 export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
-  const [cameraStatus, setCameraStatus] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { startScanning, stopScanning, videoRef, handleFileUpload, error } = useQRScanner(onQRScanned);
+  const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
 
-  const handleStartScanning = async () => {
-    try {
-      setCameraStatus("Requesting camera access...");
-      await startScanning();
-      setIsScanning(true);
-      setCameraStatus("Camera active");
-    } catch (err) {
-      console.error("Failed to start scanning:", err);
-      setCameraStatus("Camera access failed");
+  // Extract UPI ID from QR code data
+  const extractUPIId = (data: string): string | null => {
+    // Check if it's a UPI URL format: upi://pay?pa=example@upi&...
+    const upiMatch = data.match(/upi:\/\/pay\?.*pa=([^&]+)/);
+    if (upiMatch) {
+      return upiMatch[1];
     }
+
+    // Check if it's just a UPI ID: merchant@paytm
+    const directUpiMatch = data.match(/^[a-zA-Z0-9.\-_]+@[a-zA-Z0-9.\-_]+$/);
+    if (directUpiMatch) {
+      return data;
+    }
+
+    return null;
+  };
+
+  const handleScan = (result: any) => {
+    if (result && result.length > 0) {
+      const qrData = result[0].rawValue;
+      console.log("QR Code detected:", qrData);
+      
+      const upiId = extractUPIId(qrData);
+      if (upiId) {
+        console.log("UPI ID extracted:", upiId);
+        setSuccess(`UPI ID found: ${upiId}`);
+        setError("");
+        onQRScanned(upiId);
+        setIsScanning(false);
+      } else {
+        console.log("No valid UPI ID found in QR code");
+        setError("QR code found but no valid UPI ID detected");
+        setSuccess("");
+      }
+    }
+  };
+
+  const handleError = (error: any) => {
+    console.error("QR Scanner error:", error);
+    if (error?.name === "NotAllowedError") {
+      setError("Camera access denied. Please allow camera access and try again.");
+    } else if (error?.name === "NotFoundError") {
+      setError("No camera found on this device.");
+    } else if (error?.name === "NotSupportedError") {
+      setError("Camera not supported. Please use HTTPS or try uploading an image.");
+    } else {
+      setError("Failed to access camera. Please try again or upload an image.");
+    }
+    setSuccess("");
+  };
+
+  const handleStartScanning = () => {
+    setIsScanning(true);
+    setError("");
+    setSuccess("");
   };
 
   const handleStopScanning = () => {
-    stopScanning();
     setIsScanning(false);
-    setCameraStatus("");
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
-    }
+    setError("");
+    setSuccess("");
   };
 
   return (
@@ -54,33 +91,30 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
         {/* Camera View */}
         <div className="relative bg-gray-900 rounded-lg overflow-hidden mb-4 aspect-square">
           {isScanning ? (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-
-              />
-              {/* Scanning overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-48 h-48 border-2 border-primary rounded-lg relative">
-                  <div className="absolute top-0 left-0 w-6 h-6 border-l-4 border-t-4 border-primary rounded-tl-lg"></div>
-                  <div className="absolute top-0 right-0 w-6 h-6 border-r-4 border-t-4 border-primary rounded-tr-lg"></div>
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-l-4 border-b-4 border-primary rounded-bl-lg"></div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-r-4 border-b-4 border-primary rounded-br-lg"></div>
-                  {/* Animated scanning line */}
-                  <div className="absolute top-0 left-0 w-full h-0.5 bg-primary animate-pulse"></div>
-                </div>
-              </div>
-              {/* Instructions */}
-              <div className="absolute bottom-4 left-4 right-4 text-center">
-                <p className="text-white text-sm bg-black bg-opacity-50 px-3 py-1 rounded-full">
-                  Point camera at UPI QR code
-                </p>
-              </div>
-            </>
+            <Scanner
+              onScan={handleScan}
+              onError={handleError}
+              constraints={{
+                facingMode: 'environment',
+                aspectRatio: 1,
+              }}
+              styles={{
+                container: { 
+                  width: '100%', 
+                  height: '100%',
+                  position: 'relative'
+                },
+                video: {
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }
+              }}
+              components={{
+                audio: false,
+                finder: false,
+              }}
+            />
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
               <div className="text-center text-white">
@@ -93,87 +127,81 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
           )}
         </div>
 
+        {/* Status Messages */}
         {error && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <p className="text-sm text-destructive">{error}</p>
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+            <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
 
-        {cameraStatus && (
-          <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-600 text-center">{cameraStatus}</p>
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2">
+            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+            <p className="text-sm text-green-600">{success}</p>
           </div>
         )}
 
-        <div className="flex space-x-3 mb-4">
+        {/* Scanned UPI Display */}
+        {scannedUPIId && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-medium text-blue-700">UPI ID Scanned</span>
+              </div>
+            </div>
+            <p className="text-sm font-mono text-blue-600 mt-1">{scannedUPIId}</p>
+          </div>
+        )}
+
+        {/* Control Buttons */}
+        <div className="space-y-3">
           {!isScanning ? (
             <Button 
               onClick={handleStartScanning}
-              className="flex-1"
+              className="w-full flex items-center justify-center space-x-2"
+              disabled={!!scannedUPIId}
             >
-              <Camera className="w-4 h-4 mr-2" />
-              Start Scanning
+              <Camera className="w-4 h-4" />
+              <span>Start Scanning</span>
             </Button>
           ) : (
             <Button 
               onClick={handleStopScanning}
               variant="outline"
-              className="flex-1"
+              className="w-full flex items-center justify-center space-x-2"
             >
-              Stop Scanning
+              <span>Stop Scanning</span>
             </Button>
           )}
-          
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-4"
-          >
-            <Upload className="w-4 h-4" />
-          </Button>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </div>
 
-        {/* Test UPI for development */}
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-xs text-gray-600 mb-2">Camera not working? Use test mode:</p>
-          <div className="flex gap-2">
+          {/* File Upload Alternative */}
+          <div className="text-center">
+            <p className="text-xs text-gray-500 mb-2">Or upload a QR code image</p>
             <Button 
-              onClick={() => onQRScanned("testmerchant@paytm")}
               variant="outline"
               size="sm"
-              className="flex-1 text-xs"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) {
+                    // For now, just show message that file upload is selected
+                    setError("File upload scanning coming soon. Please use camera for now.");
+                  }
+                };
+                input.click();
+              }}
+              className="text-xs"
             >
-              Test UPI: testmerchant@paytm
-            </Button>
-            <Button 
-              onClick={() => onQRScanned("merchant@phonepe")}
-              variant="outline"
-              size="sm"
-              className="flex-1 text-xs"
-            >
-              Test UPI: merchant@phonepe
+              <Upload className="w-3 h-3 mr-1" />
+              Upload Image
             </Button>
           </div>
         </div>
-
-        {/* Detected UPI ID Display */}
-        {scannedUPIId && (
-          <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-4 h-4 text-success" />
-              <span className="text-sm font-medium text-success">UPI ID Detected:</span>
-              <span className="text-sm text-success font-mono">{scannedUPIId}</span>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
