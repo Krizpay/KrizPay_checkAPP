@@ -58,13 +58,21 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
                 className="w-full h-full object-cover"
               />
               {/* Scanning overlay */}
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-48 h-48 border-2 border-primary rounded-lg relative">
                   <div className="absolute top-0 left-0 w-6 h-6 border-l-4 border-t-4 border-primary rounded-tl-lg"></div>
                   <div className="absolute top-0 right-0 w-6 h-6 border-r-4 border-t-4 border-primary rounded-tr-lg"></div>
                   <div className="absolute bottom-0 left-0 w-6 h-6 border-l-4 border-b-4 border-primary rounded-bl-lg"></div>
                   <div className="absolute bottom-0 right-0 w-6 h-6 border-r-4 border-b-4 border-primary rounded-br-lg"></div>
+                  {/* Animated scanning line */}
+                  <div className="absolute top-0 left-0 w-full h-0.5 bg-primary animate-pulse"></div>
                 </div>
+              </div>
+              {/* Instructions */}
+              <div className="absolute bottom-4 left-4 right-4 text-center">
+                <p className="text-white text-sm bg-black bg-opacity-50 px-3 py-1 rounded-full">
+                  Point camera at UPI QR code
+                </p>
               </div>
             </>
           ) : (
@@ -72,6 +80,7 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
               <div className="text-center text-white">
                 <Camera className="w-12 h-12 mb-3 opacity-50 mx-auto" />
                 <p className="text-sm opacity-75">Camera will appear here</p>
+                <p className="text-xs opacity-50 mt-2">Allow camera access when prompted</p>
               </div>
             </div>
           )}
@@ -117,6 +126,19 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
             onChange={handleFileChange}
             className="hidden"
           />
+        </div>
+
+        {/* Test UPI for development */}
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+          <p className="text-xs text-gray-600 mb-2">Test Mode (Skip camera if not working):</p>
+          <Button 
+            onClick={() => onQRScanned("testmerchant@paytm")}
+            variant="outline"
+            size="sm"
+            className="w-full text-xs"
+          >
+            Use Test UPI: testmerchant@paytm
+          </Button>
         </div>
 
         {/* Detected UPI ID Display */}

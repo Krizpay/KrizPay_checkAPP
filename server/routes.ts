@@ -121,8 +121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": process.env.ONMETA_API_KEY,
-          "Authorization": `Bearer ${process.env.ONMETA_API_KEY}`,
+          "x-api-key": process.env.ONMETA_API_KEY || "",
+          "Authorization": `Bearer ${process.env.ONMETA_API_KEY || ""}`,
           "X-Forwarded-For": "127.0.0.1", // Required for instant payout
         },
         body: JSON.stringify({

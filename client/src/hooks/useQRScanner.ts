@@ -29,36 +29,69 @@ export function useQRScanner(onQRScanned: (data: string) => void) {
       setError("");
       
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera access is not supported in this browser");
+        throw new Error("Camera access is not supported in this browser. Please use HTTPS or try uploading an image instead.");
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+      // Try different camera constraints for better compatibility
+      let stream: MediaStream;
+      try {
+        // First try with back camera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { exact: "environment" },
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+          },
+        });
+      } catch (backCameraError) {
+        console.log("Back camera not available, trying front camera");
+        // Fallback to front camera or any available camera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+          },
+        });
+      }
 
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         
-        // Start QR code scanning when video is ready
+        // Wait for video to be ready and start scanning
         videoRef.current.onloadedmetadata = () => {
-          scanQRCode();
+          if (videoRef.current) {
+            videoRef.current.play().then(() => {
+              setTimeout(() => scanQRCode(), 500); // Small delay to ensure video is playing
+            });
+          }
         };
       }
 
     } catch (err: any) {
       console.error("Error starting camera:", err);
-      setError(err.message || "Failed to access camera");
+      let errorMessage = "Failed to access camera. ";
+      
+      if (err.name === "NotAllowedError") {
+        errorMessage += "Please allow camera access and try again.";
+      } else if (err.name === "NotFoundError") {
+        errorMessage += "No camera found on this device.";
+      } else if (err.name === "NotSupportedError") {
+        errorMessage += "Camera not supported in this browser.";
+      } else {
+        errorMessage += "Please try uploading an image instead.";
+      }
+      
+      setError(errorMessage);
     }
-  }, [onQRScanned]);
+  }, []);
 
   const scanQRCode = useCallback(() => {
-    if (!videoRef.current || !streamRef.current) return;
+    if (!videoRef.current || !streamRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
@@ -67,21 +100,33 @@ export function useQRScanner(onQRScanned: (data: string) => void) {
     if (!ctx) return;
 
     const scan = () => {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      if (!streamRef.current || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        return;
+      }
+
+      try {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        
-        if (code) {
-          const upiId = extractUPIId(code.data);
-          if (upiId) {
-            onQRScanned(upiId);
-            return; // Stop scanning once QR is found
+        if (canvas.width && canvas.height) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          
+          if (code) {
+            console.log("QR Code detected:", code.data);
+            const upiId = extractUPIId(code.data);
+            if (upiId) {
+              console.log("UPI ID extracted:", upiId);
+              onQRScanned(upiId);
+              // Stop scanning once QR is found
+              return;
+            }
           }
         }
+      } catch (error) {
+        console.error("Error scanning QR code:", error);
       }
       
       // Continue scanning if stream is active
