@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { QrCode, Camera, Upload, CheckCircle, XCircle } from "lucide-react";
 import { Scanner } from "@yudiel/react-qr-scanner";
+import jsQR from "jsqr";
 
 interface QRScannerProps {
   onQRScanned: (upiId: string) => void;
@@ -13,21 +14,41 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Extract UPI ID from QR code data
   const extractUPIId = (data: string): string | null => {
+    console.log("Extracting UPI ID from:", data);
+    
     // Check if it's a UPI URL format: upi://pay?pa=example@upi&...
-    const upiMatch = data.match(/upi:\/\/pay\?.*pa=([^&]+)/);
+    const upiMatch = data.match(/upi:\/\/pay\?.*pa=([^&]+)/i);
     if (upiMatch) {
+      console.log("Found UPI URL format:", upiMatch[1]);
       return upiMatch[1];
+    }
+
+    // Check for other UPI URL variations
+    const upiPayMatch = data.match(/pa=([^&\s]+)/i);
+    if (upiPayMatch) {
+      console.log("Found UPI pay parameter:", upiPayMatch[1]);
+      return upiPayMatch[1];
     }
 
     // Check if it's just a UPI ID: merchant@paytm
     const directUpiMatch = data.match(/^[a-zA-Z0-9.\-_]+@[a-zA-Z0-9.\-_]+$/);
     if (directUpiMatch) {
+      console.log("Found direct UPI ID:", data);
       return data;
     }
 
+    // Check for UPI ID patterns within the string
+    const embeddedUpiMatch = data.match(/([a-zA-Z0-9.\-_]+@[a-zA-Z0-9.\-_]+)/);
+    if (embeddedUpiMatch) {
+      console.log("Found embedded UPI ID:", embeddedUpiMatch[1]);
+      return embeddedUpiMatch[1];
+    }
+
+    console.log("No UPI ID found in data");
     return null;
   };
 
@@ -45,7 +66,7 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
         setIsScanning(false);
       } else {
         console.log("No valid UPI ID found in QR code");
-        setError("QR code found but no valid UPI ID detected");
+        setError("QR code found but no valid UPI ID detected. Please scan a UPI payment QR code.");
         setSuccess("");
       }
     }
@@ -75,6 +96,99 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
     setIsScanning(false);
     setError("");
     setSuccess("");
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setError("");
+    setSuccess("");
+    
+    console.log("Scanning uploaded file:", file.name);
+    
+    // Create a file reader to convert file to data URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageDataUrl = e.target?.result as string;
+      
+      // Create an image element
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas to process the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          setError("Failed to process image");
+          return;
+        }
+        
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // Scan the image using jsQR
+        scanImageCanvas(canvas);
+      };
+      
+      img.onerror = () => {
+        setError("Failed to load image. Please try a different image.");
+      };
+      
+      img.src = imageDataUrl;
+    };
+    
+    reader.onerror = () => {
+      setError("Failed to read the uploaded file.");
+    };
+    
+    reader.readAsDataURL(file);
+    
+    // Clear the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const scanImageCanvas = (canvas: HTMLCanvasElement) => {
+    try {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setError("Failed to process image canvas");
+        return;
+      }
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (qrCode) {
+        console.log("QR Code found in uploaded image:", qrCode.data);
+        const upiId = extractUPIId(qrCode.data);
+        
+        if (upiId) {
+          console.log("UPI ID extracted from uploaded image:", upiId);
+          setSuccess(`UPI ID found in image: ${upiId}`);
+          setError("");
+          onQRScanned(upiId);
+        } else {
+          console.log("No valid UPI ID found in uploaded QR code");
+          setError("QR code found in image but no valid UPI ID detected. Please upload a UPI payment QR code.");
+          setSuccess("");
+        }
+      } else {
+        console.log("No QR code found in uploaded image");
+        setError("No QR code found in the uploaded image. Please upload a clear image containing a QR code.");
+        setSuccess("");
+      }
+    } catch (error) {
+      console.error("Error scanning QR code from image:", error);
+      setError("Failed to scan QR code from the uploaded image.");
+    }
   };
 
   return (
@@ -177,28 +291,24 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
 
           {/* File Upload Alternative */}
           <div className="text-center">
-            <p className="text-xs text-gray-500 mb-2">Or upload a QR code image</p>
+            <p className="text-xs text-muted-foreground mb-2">Or upload a QR code image</p>
             <Button 
               variant="outline"
               size="sm"
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) {
-                    // For now, just show message that file upload is selected
-                    setError("File upload scanning coming soon. Please use camera for now.");
-                  }
-                };
-                input.click();
-              }}
+              onClick={handleUploadClick}
               className="text-xs"
+              disabled={!!scannedUPIId}
             >
               <Upload className="w-3 h-3 mr-1" />
               Upload Image
             </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
         </div>
       </CardContent>
