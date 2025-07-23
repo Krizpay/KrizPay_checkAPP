@@ -111,31 +111,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initiate Onmeta payment
+  // Initiate Onmeta payment (Offramp - crypto to fiat)
   app.post("/api/initiate-payment", async (req, res) => {
     try {
       const { merchantTxId, upiId, inrAmount, usdtAmount, walletAddress } = req.body;
       
-      // Call Onmeta API
-      const onmetaResponse = await fetch(process.env.ONMETA_API_URL || "https://api.onmeta.in/v1/crypto-to-upi", {
+      // Create Onmeta offramp order using their API (staging)
+      const onmetaResponse = await fetch("https://stg.api.onmeta.in/v1/offramp/orders/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.ONMETA_API_KEY || "your_onmeta_api_key"}`,
+          "x-api-key": process.env.ONMETA_API_KEY,
+          "Authorization": `Bearer ${process.env.ONMETA_API_KEY}`,
+          "X-Forwarded-For": "127.0.0.1", // Required for instant payout
         },
         body: JSON.stringify({
-          crypto: "usdt",
-          chain: "polygon",
-          amount: usdtAmount,
-          upi_id: upiId,
-          merchant_tx_id: merchantTxId,
-          wallet_address: walletAddress,
-          webhook_url: `${process.env.BASE_URL || "http://localhost:5000"}/api/onmeta-webhook`
+          sellTokenSymbol: "USDT",
+          sellTokenAddress: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", // USDT on Polygon
+          chainId: 137, // Polygon mainnet
+          fiatCurrency: "inr",
+          fiatAmount: parseFloat(inrAmount),
+          senderWalletAddress: walletAddress,
+          refundWalletAddress: walletAddress,
+          bankDetails: {
+            accountNumber: "temp", // This should be linked UPI for instant payout
+            ifsc: "temp"
+          },
+          metaData: {
+            merchantTxId: merchantTxId,
+            upiId: upiId,
+            webhook_url: `${process.env.BASE_URL || "http://localhost:5000"}/api/onmeta-webhook`
+          }
         }),
       });
 
       if (!onmetaResponse.ok) {
-        throw new Error(`Onmeta API error: ${onmetaResponse.statusText}`);
+        const errorText = await onmetaResponse.text();
+        console.error("Onmeta API error:", errorText);
+        throw new Error(`Onmeta API error: ${onmetaResponse.status} - ${errorText}`);
       }
 
       const onmetaData = await onmetaResponse.json();
@@ -143,16 +156,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update transaction with Onmeta response
       const transaction = await storage.getTransactionByMerchantId(merchantTxId);
       if (transaction) {
-        await storage.updateTransactionStatus(transaction.id, "processing", undefined, onmetaData.transaction_id);
+        await storage.updateTransactionStatus(transaction.id, "processing", undefined, onmetaData.data?.orderId);
       }
+
+      // Broadcast payment initiation to connected clients
+      broadcastToClients({
+        type: "payment_initiated",
+        transaction_id: merchantTxId,
+        onmeta_data: onmetaData
+      });
 
       res.json({
         success: true,
-        onmeta_response: onmetaData
+        onmeta_response: onmetaData,
+        order_id: onmetaData.data?.orderId,
+        receiver_address: onmetaData.data?.receiverWalletAddress,
+        gas_estimate: onmetaData.data?.gasUseEstimate,
+        quote: onmetaData.data?.quote
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Payment initiation error:", error);
-      res.status(500).json({ message: "Failed to initiate payment" });
+      res.status(500).json({ 
+        message: "Failed to initiate payment", 
+        error: error?.message || "Unknown error occurred" 
+      });
     }
   });
 

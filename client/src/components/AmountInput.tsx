@@ -15,7 +15,13 @@ interface AmountInputProps {
 export function AmountInput({ inrAmount, onAmountChange, disabled = false }: AmountInputProps) {
   const [inputValue, setInputValue] = useState<string>(inrAmount.toString());
 
-  const { data: exchangeRate, refetch: refreshRate, isLoading } = useQuery({
+  const { data: exchangeRate, refetch: refreshRate, isLoading } = useQuery<{
+    id: number;
+    fromCurrency: string;
+    toCurrency: string;
+    rate: string;
+    updatedAt: Date;
+  }>({
     queryKey: ["/api/exchange-rate/usdt/inr"],
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -33,7 +39,7 @@ export function AmountInput({ inrAmount, onAmountChange, disabled = false }: Amo
   };
 
   const calculateUSDT = (inr: number): number => {
-    if (!exchangeRate?.rate || inr === 0) return 0;
+    if (!exchangeRate || !exchangeRate.rate || inr === 0) return 0;
     return inr / parseFloat(exchangeRate.rate);
   };
 
@@ -73,7 +79,7 @@ export function AmountInput({ inrAmount, onAmountChange, disabled = false }: Amo
               <span className="text-sm text-gray-600">Current Rate</span>
               <div className="flex items-center space-x-1">
                 <span className="text-sm font-medium text-gray-900">
-                  {exchangeRate ? `1 USDT = ₹${parseFloat(exchangeRate.rate).toFixed(2)}` : "Loading..."}
+                  {exchangeRate && exchangeRate.rate ? `1 USDT = ₹${parseFloat(exchangeRate.rate).toFixed(2)}` : "Loading..."}
                 </span>
                 <Button
                   variant="ghost"

@@ -62,6 +62,12 @@ export class MemStorage implements IStorage {
     const transaction: Transaction = {
       ...insertTransaction,
       id,
+      status: insertTransaction.status || "pending",
+      cryptoType: insertTransaction.cryptoType || "usdt",
+      chain: insertTransaction.chain || "polygon",
+      txHash: insertTransaction.txHash || null,
+      onmetaTxId: insertTransaction.onmetaTxId || null,
+      walletAddress: insertTransaction.walletAddress || null,
       createdAt: now,
       updatedAt: now,
     };

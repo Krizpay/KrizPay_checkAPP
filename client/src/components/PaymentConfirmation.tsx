@@ -25,7 +25,13 @@ export function PaymentConfirmation({
 }: PaymentConfirmationProps) {
   const { toast } = useToast();
 
-  const { data: exchangeRate } = useQuery({
+  const { data: exchangeRate } = useQuery<{
+    id: number;
+    fromCurrency: string;
+    toCurrency: string;
+    rate: string;
+    updatedAt: Date;
+  }>({
     queryKey: ["/api/exchange-rate/usdt/inr"],
   });
 
@@ -68,7 +74,7 @@ export function PaymentConfirmation({
   });
 
   const calculateUSDT = (): number => {
-    if (!exchangeRate?.rate || inrAmount === 0) return 0;
+    if (!exchangeRate || !exchangeRate.rate || inrAmount === 0) return 0;
     return inrAmount / parseFloat(exchangeRate.rate);
   };
 

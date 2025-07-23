@@ -62,7 +62,7 @@ export function TransactionHistory() {
           </Button>
         </div>
 
-        {!transactions || transactions.length === 0 ? (
+        {!transactions || !Array.isArray(transactions) || transactions.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500 text-sm">No transactions yet</p>
           </div>

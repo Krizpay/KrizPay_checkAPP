@@ -12,7 +12,7 @@ interface QRScannerProps {
 export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { startScanning, stopScanning, videoRef, error } = useQRScanner(onQRScanned);
+  const { startScanning, stopScanning, videoRef, handleFileUpload, error } = useQRScanner(onQRScanned);
 
   const handleStartScanning = async () => {
     try {
@@ -28,17 +28,10 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
     setIsScanning(false);
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Create a file reader to read the image and extract QR code
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        // TODO: Implement QR code extraction from image
-        // For now, simulate a successful scan
-        onQRScanned("merchant@paytm");
-      };
-      reader.readAsDataURL(file);
+      handleFileUpload(file);
     }
   };
 
@@ -121,7 +114,7 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            onChange={handleFileUpload}
+            onChange={handleFileChange}
             className="hidden"
           />
         </div>
