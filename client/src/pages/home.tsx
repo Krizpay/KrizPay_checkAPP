@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { QRScanner } from "@/components/QRScanner";
-import { QRScannerTest } from "@/components/QRScannerTest";
 import { AmountInput } from "@/components/AmountInput";
 import { PaymentConfirmation } from "@/components/PaymentConfirmation";
 import { TransactionStatus } from "@/components/TransactionStatus";
@@ -17,7 +16,7 @@ export default function Home() {
   const [inrAmount, setInrAmount] = useState<number>(0);
   const [showTransactionStatus, setShowTransactionStatus] = useState<boolean>(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
-  const [useTestMode, setUseTestMode] = useState<boolean>(true); // Start with test mode
+
   
   const { isConnected, address, balance } = useWallet();
   
@@ -40,16 +39,16 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-card shadow-sm border-b border-border gradient-purple">
         <div className="max-w-md mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                 <Coins className="text-white w-4 h-4" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">KrizPay</h1>
+              <h1 className="text-xl font-bold text-white">KrizPay</h1>
             </div>
             <WalletConnection />
           </div>
@@ -57,28 +56,8 @@ export default function Home() {
       </header>
 
       <main className="max-w-md mx-auto px-4 py-6 space-y-6">
-        {/* Mode Toggle */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {useTestMode ? "Test Mode" : "Camera Mode"}
-            </span>
-            <Button
-              onClick={() => setUseTestMode(!useTestMode)}
-              variant="outline"
-              size="sm"
-            >
-              Switch to {useTestMode ? "Camera" : "Test"}
-            </Button>
-          </div>
-        </Card>
-
         {/* QR Scanner */}
-        {useTestMode ? (
-          <QRScannerTest onQRScanned={handleQRScanned} />
-        ) : (
-          <QRScanner onQRScanned={handleQRScanned} scannedUPIId={scannedUPIId} />
-        )}
+        <QRScanner onQRScanned={handleQRScanned} scannedUPIId={scannedUPIId} />
 
         {/* Amount Input */}
         <AmountInput 

@@ -84,12 +84,12 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <QrCode className="text-primary w-8 h-8" />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Scan UPI QR Code</h2>
-          <p className="text-sm text-gray-600">Point your camera at the merchant's QR code</p>
+          <h2 className="text-lg font-semibold mb-2">Scan UPI QR Code</h2>
+          <p className="text-sm text-muted-foreground">Point your camera at the merchant's QR code</p>
         </div>
 
         {/* Camera View */}
-        <div className="relative bg-gray-900 rounded-lg overflow-hidden mb-4 aspect-square">
+        <div className="relative bg-muted rounded-lg overflow-hidden mb-4 aspect-square">
           {isScanning ? (
             <Scanner
               onScan={handleScan}
@@ -111,17 +111,16 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
                 }
               }}
               components={{
-                audio: false,
                 finder: false,
               }}
             />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-              <div className="text-center text-white">
-                <Camera className="w-12 h-12 mb-3 opacity-50 mx-auto" />
-                <p className="text-sm opacity-75">Camera will appear here</p>
-                <p className="text-xs opacity-50 mt-2">Allow camera access when prompted</p>
-                <p className="text-xs opacity-30 mt-1">Make sure you're using HTTPS</p>
+            <div className="absolute inset-0 bg-gradient-to-br from-muted to-primary/20 flex items-center justify-center">
+              <div className="text-center text-primary-foreground">
+                <Camera className="w-12 h-12 mb-3 opacity-70 mx-auto" />
+                <p className="text-sm opacity-90">Camera will appear here</p>
+                <p className="text-xs opacity-70 mt-2">Allow camera access when prompted</p>
+                <p className="text-xs opacity-50 mt-1">Make sure you're using HTTPS</p>
               </div>
             </div>
           )}
