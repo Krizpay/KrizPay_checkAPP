@@ -1,9 +1,9 @@
 import { useRef, useState, useCallback } from "react";
-import jsQR from "jsqr";
+import QrScanner from "qr-scanner";
 
 export function useQRScanner(onQRScanned: (data: string) => void) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const qrScannerRef = useRef<QrScanner | null>(null);
   const [error, setError] = useState<string>("");
 
   const extractUPIId = (qrData: string): string | null => {
@@ -28,185 +28,91 @@ export function useQRScanner(onQRScanned: (data: string) => void) {
     try {
       setError("");
       
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera access is not supported in this browser. Please use HTTPS or try uploading an image instead.");
+      if (!videoRef.current) {
+        throw new Error("Video element not available");
       }
 
-      // Request camera permission with simpler constraints first
-      let stream: MediaStream;
-      try {
-        // Try basic video constraints first
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false
-        });
-        console.log("Camera stream obtained successfully");
-      } catch (basicError) {
-        console.log("Basic camera access failed, trying with specific constraints");
-        try {
-          // Try with back camera
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "environment",
-              width: { ideal: 640, max: 1280 },
-              height: { ideal: 480, max: 720 }
+      // Create QR scanner instance
+      qrScannerRef.current = new QrScanner(
+        videoRef.current,
+        (result) => {
+          console.log("QR Code detected:", result.data);
+          const upiId = extractUPIId(result.data);
+          if (upiId) {
+            console.log("UPI ID extracted:", upiId);
+            onQRScanned(upiId);
+            // Stop scanning after successful detection
+            if (qrScannerRef.current) {
+              qrScannerRef.current.stop();
             }
-          });
-        } catch (backCameraError) {
-          console.log("Back camera not available, trying front camera");
-          // Fallback to front camera
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "user",
-              width: { ideal: 640, max: 1280 },
-              height: { ideal: 480, max: 720 }
-            }
-          });
-        }
-      }
-
-      streamRef.current = stream;
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        
-        // Wait for video to be ready and start scanning
-        videoRef.current.onloadedmetadata = () => {
-          console.log("Video metadata loaded");
-          if (videoRef.current) {
-            videoRef.current.play().then(() => {
-              console.log("Video started playing");
-              setTimeout(() => {
-                console.log("Starting QR code scanning");
-                scanQRCode();
-              }, 1000); // Longer delay to ensure video is stable
-            }).catch((playError) => {
-              console.error("Video play failed:", playError);
-              setError("Failed to start video playback");
-            });
+          } else {
+            console.log("No valid UPI ID found in QR code");
           }
-        };
-        
-        // Also handle the case where video is already ready
-        if (videoRef.current.readyState >= 2) {
-          videoRef.current.play().then(() => {
-            setTimeout(() => scanQRCode(), 1000);
-          });
+        },
+        {
+          onDecodeError: (error) => {
+            // This is normal - it means no QR code was found in the frame
+            // Don't log these as they happen constantly during scanning
+          },
+          preferredCamera: 'environment', // Prefer back camera
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
         }
-      }
+      );
 
+      // Start the scanner
+      await qrScannerRef.current.start();
+      console.log("QR Scanner started successfully");
+      
     } catch (err: any) {
-      console.error("Error starting camera:", err);
+      console.error("Error starting QR scanner:", err);
       let errorMessage = "Failed to access camera. ";
       
       if (err.name === "NotAllowedError") {
         errorMessage += "Please allow camera access and try again.";
       } else if (err.name === "NotFoundError") {
         errorMessage += "No camera found on this device.";
-      } else if (err.name === "NotSupportedError") {
-        errorMessage += "Camera not supported in this browser.";
+      } else if (err.name === "NotSupportedError" || err.message.includes("not supported")) {
+        errorMessage += "Camera not supported in this browser. Please use HTTPS.";
       } else {
         errorMessage += "Please try uploading an image instead.";
       }
       
       setError(errorMessage);
     }
-  }, []);
-
-  const scanQRCode = useCallback(() => {
-    if (!videoRef.current || !streamRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) return;
-
-    const scan = () => {
-      if (!streamRef.current || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        return;
-      }
-
-      try {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        if (canvas.width && canvas.height) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          
-          if (code) {
-            console.log("QR Code detected:", code.data);
-            const upiId = extractUPIId(code.data);
-            if (upiId) {
-              console.log("UPI ID extracted:", upiId);
-              onQRScanned(upiId);
-              // Stop scanning once QR is found
-              return;
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error scanning QR code:", error);
-      }
-      
-      // Continue scanning if stream is active
-      if (streamRef.current) {
-        requestAnimationFrame(scan);
-      }
-    };
-    
-    requestAnimationFrame(scan);
   }, [onQRScanned, extractUPIId]);
 
   const stopScanning = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop();
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
+      console.log("QR Scanner stopped");
     }
     
     setError("");
   }, []);
 
-  const handleFileUpload = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) return;
-        
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        
-        if (code) {
-          const upiId = extractUPIId(code.data);
-          if (upiId) {
-            onQRScanned(upiId);
-          } else {
-            setError("QR code found but no valid UPI ID detected");
-          }
-        } else {
-          setError("No QR code found in the image");
-        }
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+  const handleFileUpload = useCallback(async (file: File) => {
+    try {
+      setError("");
+      console.log("Scanning uploaded file for QR code");
+      
+      const result = await QrScanner.scanImage(file, {
+        returnDetailedScanResult: true,
+      });
+      
+      console.log("QR Code detected in file:", result.data);
+      const upiId = extractUPIId(result.data);
+      if (upiId) {
+        onQRScanned(upiId);
+      } else {
+        setError("QR code found but no valid UPI ID detected");
+      }
+    } catch (error) {
+      console.error("Error scanning uploaded file:", error);
+      setError("No QR code found in the uploaded image");
+    }
   }, [onQRScanned, extractUPIId]);
 
   return {

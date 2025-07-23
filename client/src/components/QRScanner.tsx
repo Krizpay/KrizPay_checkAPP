@@ -61,6 +61,7 @@ export function QRScanner({ onQRScanned, scannedUPIId }: QRScannerProps) {
                 playsInline
                 muted
                 className="w-full h-full object-cover"
+                style={{ transform: 'scaleX(-1)' }}
               />
               {/* Scanning overlay */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
