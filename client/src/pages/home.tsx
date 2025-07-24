@@ -7,6 +7,7 @@ import { PaymentConfirmation } from "@/components/PaymentConfirmation";
 import { TransactionStatus } from "@/components/TransactionStatus";
 import { TransactionHistory } from "@/components/TransactionHistory";
 import { WalletConnection } from "@/components/WalletConnection";
+import { TokenSelector } from "@/components/TokenSelector";
 import { useWallet } from "@/hooks/useWallet";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Coins, Settings, HelpCircle } from "lucide-react";
@@ -17,8 +18,7 @@ export default function Home() {
   const [showTransactionStatus, setShowTransactionStatus] = useState<boolean>(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
 
-  
-  const { isConnected, address, balance } = useWallet();
+  // Wallet context is now available through WalletProvider
   
   useWebSocket((message) => {
     if (message.type === "transaction_updated") {
@@ -50,12 +50,18 @@ export default function Home() {
               </div>
               <h1 className="text-xl font-bold text-white">KrizPay</h1>
             </div>
-            <WalletConnection />
+            <WalletConnection compact={true} showBalance={false} />
           </div>
         </div>
       </header>
 
       <main className="max-w-md mx-auto px-4 py-6 space-y-6">
+        {/* Wallet Connection & Balance */}
+        <WalletConnection showBalance={true} />
+
+        {/* Token Selector */}
+        <TokenSelector />
+
         {/* QR Scanner */}
         <QRScanner onQRScanned={handleQRScanned} scannedUPIId={scannedUPIId} />
 
@@ -71,9 +77,6 @@ export default function Home() {
           <PaymentConfirmation
             upiId={scannedUPIId}
             inrAmount={inrAmount}
-            walletConnected={isConnected}
-            walletAddress={address}
-            balance={balance}
             onPaymentInitiated={handlePaymentInitiated}
           />
         )}

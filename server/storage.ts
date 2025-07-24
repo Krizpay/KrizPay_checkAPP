@@ -31,11 +31,17 @@ export class MemStorage implements IStorage {
     this.currentTransactionId = 1;
     this.currentRateId = 1;
     
-    // Initialize with default exchange rate
+    // Initialize with default exchange rates
     this.upsertExchangeRate({
       fromCurrency: "usdt",
       toCurrency: "inr",
       rate: "84.50"
+    });
+    
+    this.upsertExchangeRate({
+      fromCurrency: "matic",
+      toCurrency: "inr",
+      rate: "65.75"
     });
   }
 

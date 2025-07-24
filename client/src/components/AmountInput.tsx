@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { useWallet } from "@/hooks/useWallet";
+import { RefreshCw, Coins, Zap } from "lucide-react";
 
 interface AmountInputProps {
   inrAmount: number;
@@ -14,8 +15,10 @@ interface AmountInputProps {
 
 export function AmountInput({ inrAmount, onAmountChange, disabled = false }: AmountInputProps) {
   const [inputValue, setInputValue] = useState<string>(inrAmount.toString());
+  const { selectedToken } = useWallet();
 
-  const { data: exchangeRate, refetch: refreshRate, isLoading } = useQuery<{
+  // Query for both USDT and MATIC exchange rates
+  const { data: usdtRate, refetch: refreshUsdtRate, isLoading: isUsdtLoading } = useQuery<{
     id: number;
     fromCurrency: string;
     toCurrency: string;
@@ -23,8 +26,22 @@ export function AmountInput({ inrAmount, onAmountChange, disabled = false }: Amo
     updatedAt: Date;
   }>({
     queryKey: ["/api/exchange-rate/usdt/inr"],
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
+
+  const { data: maticRate, refetch: refreshMaticRate, isLoading: isMaticLoading } = useQuery<{
+    id: number;
+    fromCurrency: string;
+    toCurrency: string;
+    rate: string;
+    updatedAt: Date;
+  }>({
+    queryKey: ["/api/exchange-rate/matic/inr"],
+    refetchInterval: 30000,
+  });
+
+  const currentRate = selectedToken === 'USDT' ? usdtRate : maticRate;
+  const isLoading = selectedToken === 'USDT' ? isUsdtLoading : isMaticLoading;
 
   useEffect(() => {
     setInputValue(inrAmount.toString());
@@ -38,12 +55,28 @@ export function AmountInput({ inrAmount, onAmountChange, disabled = false }: Amo
     onAmountChange(numValue);
   };
 
-  const calculateUSDT = (inr: number): number => {
-    if (!exchangeRate || !exchangeRate.rate || inr === 0) return 0;
-    return inr / parseFloat(exchangeRate.rate);
+  const calculateTokenAmount = (inr: number): number => {
+    if (!currentRate || !currentRate.rate || inr === 0) return 0;
+    return inr / parseFloat(currentRate.rate);
   };
 
-  const calculatedUSDT = calculateUSDT(inrAmount);
+  const calculatedTokenAmount = calculateTokenAmount(inrAmount);
+
+  const refreshRate = () => {
+    if (selectedToken === 'USDT') {
+      refreshUsdtRate();
+    } else {
+      refreshMaticRate();
+    }
+  };
+
+  const getTokenIcon = () => {
+    return selectedToken === 'USDT' ? Coins : Zap;
+  };
+
+  const getTokenColor = () => {
+    return selectedToken === 'USDT' ? 'text-yellow-600' : 'text-purple-600';
+  };
 
   return (
     <Card className={disabled ? "opacity-50" : ""}>
@@ -79,12 +112,12 @@ export function AmountInput({ inrAmount, onAmountChange, disabled = false }: Amo
               <span className="text-sm text-gray-600">Current Rate</span>
               <div className="flex items-center space-x-1">
                 <span className="text-sm font-medium text-gray-900">
-                  {exchangeRate && exchangeRate.rate ? `1 USDT = ₹${parseFloat(exchangeRate.rate).toFixed(2)}` : "Loading..."}
+                  {currentRate && currentRate.rate ? `1 ${selectedToken} = ₹${parseFloat(currentRate.rate).toFixed(2)}` : "Loading..."}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => refreshRate()}
+                  onClick={refreshRate}
                   disabled={isLoading}
                   className="w-6 h-6 p-0"
                 >
@@ -93,13 +126,14 @@ export function AmountInput({ inrAmount, onAmountChange, disabled = false }: Amo
               </div>
             </div>
             
-            {/* USDT Amount Display */}
+            {/* Token Amount Display */}
             <div className="border-t border-gray-200 pt-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">You'll pay</span>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-gray-900">
-                    {calculatedUSDT.toFixed(6)} USDT
+                  <div className={`text-lg font-bold flex items-center space-x-1 ${getTokenColor()}`}>
+                    {React.createElement(getTokenIcon(), { className: "w-4 h-4" })}
+                    <span>{calculatedTokenAmount.toFixed(6)} {selectedToken}</span>
                   </div>
                   <div className="text-xs text-gray-500">on Polygon Network</div>
                 </div>

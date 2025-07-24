@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onmeta Widget Test</title>
+</head>
+<body>
+    <h1>Onmeta Widget Test</h1>
+    <div id="widget"></div>
+
+    <!-- Onmeta Widget Script -->
+    <script src="https://widget.onmeta.in/sdk.js"></script>
+    
+    <script>
+        // Widget configuration
+        var elementId = "widget";
+        var apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI2ODdmM2E3NGM3ODc5NzkzZjhkZTQ3ZmEiLCJhcGlLZXkiOiIzOWNkZGQzYy0yNDg0LTQ4ZTYtYjA4Ni04NjBjMGM2MmY0YTAiLCJ1c2VySWQiOiIiLCJleHAiOjE3ODQ3MDQ1MDAsImlhdCI6MTc1MzE2ODUwMH0.dAmJsRsiD5GcekVbQAhvsEDXd0FTfdwMaauaOoIIZRY";
+        var environment = "staging";
+        var fiatType = "inr";
+        var walletAddress = "0x742d35Cc6634C0532925a3b8D4C9db96590c6C8C";
+        var fiatAmount = 100;
+        var chainId = "137";
+        var tokenSymbol = "USDT";
+        var tokenAddress = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F";
+        var metaData = JSON.stringify({
+            "userID": "test123",
+            "userName": "testuser"
+        });
+
+        // Event handlers
+        function onSuccess(data) {
+            console.log('Payment success:', data);
+            alert('Payment successful!');
+        }
+
+        function onFailure(data) {
+            console.log('Payment failed:', data);
+            alert('Payment failed: ' + (data.message || 'Unknown error'));
+        }
+
+        function onOrderEvent(data) {
+            console.log('Order event:', data);
+        }
+
+        // Initialize widget when page loads
+        window.onload = function() {
+            console.log('Page loaded, checking createWidget...');
+            
+            if (typeof createWidget !== 'undefined') {
+                console.log('createWidget is available');
+                
+                // Set up event listeners
+                createWidget.on('SUCCESS', onSuccess);
+                createWidget.on('FAILED', onFailure);
+                createWidget.on('ORDER_EVENTS', onOrderEvent);
+                createWidget.on('ALL_EVENTS', function(data) {
+                    console.log('All events:', data);
+                });
+                
+                // Initialize the widget
+                createWidget.init();
+                console.log('Widget initialized');
+            } else {
+                console.error('createWidget is not available');
+                document.getElementById('widget').innerHTML = '<p style="color: red;">Widget failed to load</p>';
+            }
+        };
+    </script>
+</body>
+</html>

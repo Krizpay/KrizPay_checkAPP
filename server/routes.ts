@@ -36,8 +36,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create transaction
   app.post("/api/transactions", async (req, res) => {
     try {
+      console.log("Creating transaction with data:", JSON.stringify(req.body, null, 2));
+      
       const validatedData = insertTransactionSchema.parse(req.body);
+      console.log("Validated transaction data:", JSON.stringify(validatedData, null, 2));
+      
       const transaction = await storage.createTransaction(validatedData);
+      console.log("Created transaction:", JSON.stringify(transaction, null, 2));
       
       // Broadcast transaction creation to connected clients
       broadcastToClients({
@@ -47,10 +52,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(transaction);
     } catch (error) {
+      console.error("Transaction creation error:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid transaction data", errors: error.errors });
+        console.error("Validation errors:", error.errors);
+        return res.status(400).json({ 
+          message: "Invalid transaction data", 
+          errors: error.errors,
+          received_data: req.body
+        });
       }
-      res.status(500).json({ message: "Failed to create transaction" });
+      res.status(500).json({ 
+        message: "Failed to create transaction",
+        error: error?.message || "Unknown error"
+      });
     }
   });
 
@@ -114,9 +128,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initiate Onmeta payment (Offramp - crypto to fiat)
   app.post("/api/initiate-payment", async (req, res) => {
     try {
-      const { merchantTxId, upiId, inrAmount, usdtAmount, walletAddress } = req.body;
+      const { merchantTxId, upiId, inrAmount, usdtAmount, maticAmount, walletAddress } = req.body;
+      
+      // Determine which token is being used
+      const isUSDT = usdtAmount && parseFloat(usdtAmount) > 0;
+      const isMATIC = maticAmount && parseFloat(maticAmount) > 0;
+      
+      if (!isUSDT && !isMATIC) {
+        throw new Error("No valid token amount provided");
+      }
+      
+      // Set token details based on selection
+      const tokenSymbol = isUSDT ? "USDT" : "MATIC";
+      const tokenAddress = isUSDT 
+        ? "0xc2132D05D31c914a87C6611C10748AEb04B58e8F" // USDT on Polygon
+        : "0x0000000000000000000000000000000000001010"; // MATIC on Polygon (native)
+      const tokenAmount = isUSDT ? usdtAmount : maticAmount;
+      
+      console.log(`Initiating ${tokenSymbol} payment:`, {
+        merchantTxId,
+        upiId,
+        inrAmount,
+        tokenAmount,
+        tokenSymbol,
+        walletAddress
+      });
       
       // Create Onmeta offramp order using their API (staging)
+      const onmetaPayload = {
+        sellTokenSymbol: tokenSymbol,
+        sellTokenAddress: tokenAddress,
+        chainId: 137, // Polygon mainnet
+        fiatCurrency: "INR",
+        fiatAmount: parseFloat(inrAmount),
+        senderWalletAddress: walletAddress,
+        refundWalletAddress: walletAddress,
+        bankDetails: {
+          accountNumber: "instant_payout", // For UPI instant payout
+          ifsc: "UPI"
+        },
+        metaData: {
+          merchantTxId: merchantTxId,
+          upiId: upiId,
+          webhook_url: `${process.env.BASE_URL || "http://localhost:5000"}/api/onmeta-webhook`
+        }
+      };
+      
+      console.log("Onmeta API payload:", JSON.stringify(onmetaPayload, null, 2));
+      
       const onmetaResponse = await fetch("https://stg.api.onmeta.in/v1/offramp/orders/create", {
         method: "POST",
         headers: {
@@ -125,38 +184,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "Authorization": `Bearer ${process.env.ONMETA_API_KEY || ""}`,
           "X-Forwarded-For": "127.0.0.1", // Required for instant payout
         },
-        body: JSON.stringify({
-          sellTokenSymbol: "USDT",
-          sellTokenAddress: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", // USDT on Polygon
-          chainId: 137, // Polygon mainnet
-          fiatCurrency: "inr",
-          fiatAmount: parseFloat(inrAmount),
-          senderWalletAddress: walletAddress,
-          refundWalletAddress: walletAddress,
-          bankDetails: {
-            accountNumber: "temp", // This should be linked UPI for instant payout
-            ifsc: "temp"
-          },
-          metaData: {
-            merchantTxId: merchantTxId,
-            upiId: upiId,
-            webhook_url: `${process.env.BASE_URL || "http://localhost:5000"}/api/onmeta-webhook`
-          }
-        }),
+        body: JSON.stringify(onmetaPayload),
       });
 
+      const responseText = await onmetaResponse.text();
+      console.log("Onmeta API response:", responseText);
+
       if (!onmetaResponse.ok) {
-        const errorText = await onmetaResponse.text();
-        console.error("Onmeta API error:", errorText);
-        throw new Error(`Onmeta API error: ${onmetaResponse.status} - ${errorText}`);
+        console.error("Onmeta API error:", {
+          status: onmetaResponse.status,
+          statusText: onmetaResponse.statusText,
+          response: responseText
+        });
+        throw new Error(`Onmeta API error: ${onmetaResponse.status} - ${responseText}`);
       }
 
-      const onmetaData = await onmetaResponse.json();
+      let onmetaData;
+      try {
+        onmetaData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Failed to parse Onmeta response:", parseError);
+        throw new Error("Invalid response from Onmeta API");
+      }
+      
+      console.log("Parsed Onmeta data:", onmetaData);
       
       // Update transaction with Onmeta response
       const transaction = await storage.getTransactionByMerchantId(merchantTxId);
       if (transaction) {
-        await storage.updateTransactionStatus(transaction.id, "processing", undefined, onmetaData.data?.orderId);
+        await storage.updateTransactionStatus(
+          transaction.id, 
+          "processing", 
+          undefined, 
+          onmetaData.data?.orderId || onmetaData.orderId
+        );
       }
 
       // Broadcast payment initiation to connected clients
@@ -169,16 +230,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         onmeta_response: onmetaData,
-        order_id: onmetaData.data?.orderId,
-        receiver_address: onmetaData.data?.receiverWalletAddress,
-        gas_estimate: onmetaData.data?.gasUseEstimate,
-        quote: onmetaData.data?.quote
+        order_id: onmetaData.data?.orderId || onmetaData.orderId,
+        receiver_address: onmetaData.data?.receiverWalletAddress || onmetaData.receiverWalletAddress,
+        gas_estimate: onmetaData.data?.gasUseEstimate || onmetaData.gasUseEstimate,
+        quote: onmetaData.data?.quote || onmetaData.quote,
+        token_symbol: tokenSymbol,
+        token_amount: tokenAmount
       });
     } catch (error: any) {
       console.error("Payment initiation error:", error);
       res.status(500).json({ 
         message: "Failed to initiate payment", 
-        error: error?.message || "Unknown error occurred" 
+        error: error?.message || "Unknown error occurred",
+        details: error?.stack || "No stack trace available"
       });
     }
   });

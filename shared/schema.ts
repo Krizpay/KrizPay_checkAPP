@@ -13,7 +13,7 @@ export const transactions = pgTable("transactions", {
   merchantTxId: text("merchant_tx_id").notNull().unique(),
   upiId: text("upi_id").notNull(),
   inrAmount: decimal("inr_amount", { precision: 10, scale: 2 }).notNull(),
-  usdtAmount: decimal("usdt_amount", { precision: 10, scale: 6 }).notNull(),
+  tokenAmount: decimal("token_amount", { precision: 18, scale: 8 }).notNull(),
   cryptoType: text("crypto_type").notNull().default("usdt"),
   chain: text("chain").notNull().default("polygon"),
   status: text("status").notNull().default("pending"), // pending, processing, success, failed
