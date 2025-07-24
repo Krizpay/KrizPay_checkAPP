@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Send } from "lucide-react";
+import { Send, Loader2, Wallet, ArrowRight, Coins } from "lucide-react";
 
 interface PaymentConfirmationProps {
   upiId: string;
@@ -154,15 +154,54 @@ export function PaymentConfirmation({
           </div>
         )}
 
-        {/* Payment Button */}
-        <Button
-          onClick={handlePayment}
-          disabled={!walletConnected || isLoading || finalUSDTAmount === 0}
-          className="w-full py-4 text-lg font-semibold"
-        >
-          <Send className="w-5 h-5 mr-2" />
-          {isLoading ? "Processing..." : "Pay Now"}
-        </Button>
+        {/* Animated Payment Button */}
+        {isLoading ? (
+          <div className="space-y-4">
+            {/* Loading Animation */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4">
+              <div className="flex items-center justify-center space-x-4 mb-3">
+                <div className="relative">
+                  <Wallet className="w-8 h-8 text-blue-500 animate-pulse" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping"></div>
+                </div>
+                <ArrowRight className="w-6 h-6 text-purple-500 animate-pulse" />
+                <div className="relative">
+                  <Coins className="w-8 h-8 text-purple-500 animate-spin" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-ping"></div>
+                </div>
+                <ArrowRight className="w-6 h-6 text-green-500 animate-pulse" />
+                <div className="relative">
+                  <Send className="w-8 h-8 text-green-500 animate-bounce" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
+                </div>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-gray-700 mb-1">Processing Payment</p>
+                <p className="text-xs text-gray-500">Please confirm in your wallet...</p>
+              </div>
+              {/* Progress bar */}
+              <div className="mt-3 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 animate-pulse"></div>
+              </div>
+            </div>
+            <Button disabled className="w-full py-4 text-lg font-semibold bg-gray-400">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Processing...
+            </Button>
+          </div>
+        ) : (
+          <Button
+            onClick={handlePayment}
+            disabled={!walletConnected || finalUSDTAmount === 0}
+            className="w-full py-4 text-lg font-semibold relative overflow-hidden group hover:scale-105 transition-transform duration-200"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative flex items-center justify-center">
+              <Send className="w-5 h-5 mr-2 group-hover:animate-pulse" />
+              Pay Now
+            </div>
+          </Button>
+        )}
 
         {!walletConnected && (
           <p className="text-sm text-gray-500 text-center mt-2">

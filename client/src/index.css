@@ -69,6 +69,37 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* Prevent zoom on iOS when focusing inputs */
+    -webkit-text-size-adjust: 100%;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: none;
+  }
+
+  /* Mobile-specific improvements */
+  input, textarea, select {
+    /* Prevent zoom on iOS */
+    font-size: 16px;
+  }
+
+  /* Improve touch targets */
+  button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better mobile scrolling */
+  .scroll-smooth {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent text selection on UI elements */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
   }
 }
 
@@ -90,5 +121,63 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  /* Custom payment animations */
+  .payment-pulse {
+    animation: payment-pulse 2s ease-in-out infinite;
+  }
+
+  .success-celebration {
+    animation: success-celebration 0.6s ease-out;
+  }
+
+  .floating-particle {
+    animation: floating-particle 3s ease-in-out infinite;
+  }
+
+  .slide-in-up {
+    animation: slide-in-up 0.5s ease-out;
+  }
+
+  @keyframes payment-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+  }
+
+  @keyframes success-celebration {
+    0% { transform: scale(0.8) rotate(-10deg); opacity: 0; }
+    50% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  @keyframes floating-particle {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    33% { transform: translateY(-10px) rotate(120deg); }
+    66% { transform: translateY(5px) rotate(240deg); }
+  }
+
+  @keyframes slide-in-up {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  /* Mobile-specific improvements */
+  @media (max-width: 640px) {
+    .dialog-content {
+      margin: 1rem;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    /* Improve touch targets on mobile */
+    button {
+      min-height: 48px;
+    }
+    
+    /* Better spacing for mobile */
+    .mobile-spacing {
+      padding: 1rem;
+    }
   }
 }
