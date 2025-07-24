@@ -3,14 +3,14 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist/public",
   "functions": {
-    "server/index.ts": {
-      "runtime": "@vercel/node"
+    "api/serverless.ts": {
+      "runtime": "@vercel/node@3.0.0"
     }
   },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/serverless"
+      "dest": "/api/serverless.js"
     },
     {
       "handle": "filesystem"
@@ -19,8 +19,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
